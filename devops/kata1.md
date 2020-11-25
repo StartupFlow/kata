@@ -25,4 +25,5 @@ The CTO and CEO have to connect to the services and DB to validate their disponi
 
 # Definition of Done 
 The expected result is a infrastructure graph with the services/solutions used to solve the problems with the explaination.
+
 A roadmap of their deployment (which one come first and which one come last) if their some complexity or long term gains.
