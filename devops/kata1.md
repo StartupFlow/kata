@@ -12,6 +12,7 @@ We actually deploy 3 different applications :
  * 1 Rest API exposed to the internal flow connected to a Mysql, use by the first API
  * 1 WebApp Single page.
  
+![Stack1](./assets/stack1.png)
 
 # Problems :
 We have some 500 errors and can’t reproduce the actual error to debug it as they are inconsistent. But they only happen when using Service 1 and Service 2
