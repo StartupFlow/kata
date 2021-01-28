@@ -10,7 +10,7 @@ A player who hesitates or makes a mistake is eliminated from the game.
 
 ### Definition
 
-Implement the logic for the fizzbuzz inside an idempotentfunction, and a wrapper who'll to run the test from 1 to N.
+Implement the logic for the fizzbuzz inside an idempotent function, and a wrapper who'll run the test from 1 to N.
 
 ### Test dataset
 
