@@ -15,6 +15,11 @@ Our whole application is run inside Docker Swarm.
 ## Questions
 
  * What are the principal security risks in the platform?
- * What are the first KPIs you would start monitoring?
- * Do you know security risks within the Docker technology?
  * What are the most important policies the "development" team must follow for security purpose?
+ * Propose a template for a **POST-INCIDENT REVIEW**? 
+ * After a data breach for Client-company-One, where only machine metrics where accessed, prepare an "Post-Incident Communication" for the client administrator?
+
+### Optional questions
+
+ * Do you know security risks within the Docker technology?
+ * What are the first KPIs you would start monitoring?
