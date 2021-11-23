@@ -3,7 +3,7 @@ function fizzbuzz(number) {
   return '0';
 }
 
-// Implement the wrapper so we can count from 0 to STOP.
+// Implement the wrapper
 function main() {
    for(let i=0; i<10;i++) {
      console.log(fizzbuzz(i));
