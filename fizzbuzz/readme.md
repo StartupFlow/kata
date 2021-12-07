@@ -8,13 +8,55 @@ However, any number divisible by three is replaced by the word **fizz** and any 
 Numbers divisible by 15 become **fizzbuzz**. 
 A player who hesitates or makes a mistake is eliminated from the game.
 
-### Definition
+### TODO
 
-Implement the logic for the fizzbuzz inside an idempotent function, and a wrapper who'll run the test from 1 to N.
+Implement the logic for the fizzbuzz in Node.js, inside a pure function, and a wrapper who'll run the test from 1 to n.
+The program should be invoked with 
+```shell
+npm run fizzbuzz n
+``` 
+and must ouput fizzbuzz values from 1 to n.
 
-### Test dataset
-
-[1, 2, Fizz, 4, Buzz, Fizz, 7, 8, Fizz, Buzz, 11, Fizz, 13, 14, FizzBuzz, 16, 17, Fizz, 19, Buzz, Fizz, 22, 23, Fizz, Buzz, 26, Fizz, 28, 29, FizzBuzz, 31, 32, Fizz, 34, Buzz, Fizz]
+### Expected output
+If n=36, expected output is:
+```shell
+1
+2
+fizz
+4
+buzz
+fizz
+7
+8
+fizz
+buzz
+11
+fizz
+13
+14
+fizzbuzz
+16
+17
+fizz
+19
+buzz
+fizz
+22
+23
+fizz
+buzz
+26
+fizz
+28
+29
+fizzbuzz
+31
+32
+fizz
+34
+buzz
+fizz
+```
 
 ### Time
 
