@@ -1,0 +1,24 @@
+{
+  "name": "kata-find-deleted-items",
+  "version": "1.0.0",
+  "description": "see readme.md",
+  "main": "update-catalog.js",
+  "scripts": {
+    "generate:S": "node generate-dataset.js --size=100",
+    "generate:M": "node generate-dataset.js --size=10000",
+    "generate:L": "node generate-dataset.js --size=100000",
+    "generate:XL": "node generate-dataset.js --size=1000000",
+    "update": "node update-catalog.js",
+    "test": "jest"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bluebird": "^3.7.2",
+    "jest": "^28.1.3",
+    "lodash": "^4.17.21",
+    "minimist": "^1.2.6",
+    "mongodb": "^4.8.1",
+    "uuid": "^8.3.2"
+  }
+}
