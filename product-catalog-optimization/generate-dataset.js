@@ -33,7 +33,7 @@ async function main() {
 }
 
 async function clearExistingData(db) {
-  const listDatabaseResult = await db.admin().listDatabases({nameOnly: 1});
+  const listDatabaseResult = await db.admin().listDatabases({ nameOnly: 1 });
   if (listDatabaseResult.databases.find(d => d.name === DATABASE_NAME)) {
     await db.dropDatabase();
   }
@@ -45,26 +45,28 @@ async function clearExistingData(db) {
 
 async function generateDataset(db, catalogSize) {
   writeCsvHeaders();
-
   const metrics = Metrics.zero();
   const createdAt = new Date();
+  let batch =  db.collection('Products').initializeOrderedBulkOp();
+  const appendStream = fs.createWriteStream(catalogUpdateFile, {flags:'a'});
   for (let i = 0; i < catalogSize; i++) {
     const product = generateProduct(i, createdAt);
-
     // insert in initial dataset
-    await db.collection('Products').insertOne(product);
-
+    batch.insert(product);
     // insert in updated dataset (csv) with a tweak
     const updatedProduct = generateUpdate(product, i, catalogSize);
-    metrics.merge(writeProductUpdateToCsv(product, updatedProduct));
+    metrics.merge(writeProductUpdateToCsv(product, updatedProduct, appendStream));
 
-    const progressPercentage = i*100/catalogSize;
-    if ((progressPercentage)%10 === 0) {
+    const progressPercentage = i * 100 / catalogSize;
+    if ((progressPercentage) % 10 === 0) {
       console.debug(`[DEBUG] Processing ${progressPercentage}%...`);
     }
-  }
-
+  } 
+  //Insert many instead of insertone
+  await batch.execute();
+  
   logMetrics(catalogSize, metrics);
+  appendStream.end();
 }
 
 function writeCsvHeaders() {
@@ -104,17 +106,20 @@ function generateUpdate(product, index, catalogSize) {
   return product; // [pAdd; 100]
 }
 
-function writeProductUpdateToCsv(product, updatedProduct) {
+function writeProductUpdateToCsv(product, updatedProduct, appendStream) {
   if (updatedProduct) {
     if (updatedProduct._id === product._id) {
       // Updated product or no modification => add this line
-      fs.appendFileSync(catalogUpdateFile, updatedProduct.toCsv() + '\n');
+      appendStream.write(updatedProduct.toCsv() + '\n');
+      //fs.appendFileSync(catalogUpdateFile, updatedProduct.toCsv() + '\n');
       return updatedProduct.updatedAt !== updatedProduct.createdAt ? Metrics.updated() : Metrics.zero();
     } else {
       // keep product
-      fs.appendFileSync(catalogUpdateFile, product.toCsv() + '\n');
+      //fs.appendFileSync(catalogUpdateFile, product.toCsv() + '\n');
+      appendStream.write(product.toCsv() + '\n');
       // add new product
-      fs.appendFileSync(catalogUpdateFile, updatedProduct.toCsv() + '\n');
+      //fs.appendFileSync(catalogUpdateFile, updatedProduct.toCsv() + '\n');
+      appendStream.write(updatedProduct.toCsv() + '\n');
       return Metrics.added();
     }
   } else {
@@ -125,8 +130,8 @@ function writeProductUpdateToCsv(product, updatedProduct) {
 function logMetrics(catalogSize, metrics) {
   console.info(`[INFO] ${catalogSize} products inserted in DB.`);
   console.info(`[INFO] ${metrics.addedCount} products to be added.`);
-  console.info(`[INFO] ${metrics.updatedCount} products to be updated ${(metrics.updatedCount*100/catalogSize).toFixed(2)}%.`);
-  console.info(`[INFO] ${metrics.deletedCount} products to be deleted ${(metrics.deletedCount*100/catalogSize).toFixed(2)}%.`);
+  console.info(`[INFO] ${metrics.updatedCount} products to be updated ${(metrics.updatedCount * 100 / catalogSize).toFixed(2)}%.`);
+  console.info(`[INFO] ${metrics.deletedCount} products to be deleted ${(metrics.deletedCount * 100 / catalogSize).toFixed(2)}%.`);
 }
 
 if (require.main === module) {

@@ -28,45 +28,42 @@ async function updateDataset(db) {
 
   const metrics = Metrics.zero();
   function updateMetrics(updateResult) {
-    if (updateResult.modifiedCount) {
-      metrics.updatedCount += 1;
+    if (updateResult.nModified) {
+      metrics.updatedCount += updateResult.nModified;
     }
-    if (updateResult.upsertedCount) {
-      metrics.addedCount += 1;
+    if (updateResult.nUpserted) {
+      metrics.addedCount += updateResult.nUpserted;
     }
   }
 
   const dbCatalogSize = await db.collection('Products').count();
-  const closestPowOf10 = 10**(Math.ceil(Math.log10(dbCatalogSize)));
+  const closestPowOf10 = 10 ** (Math.ceil(Math.log10(dbCatalogSize)));
+
   function logProgress(nbCsvRows) {
     const progressIndicator = nbCsvRows * 100 / closestPowOf10;
-    if (progressIndicator%10 === 0) {
+    if (progressIndicator % 10 === 0) {
       console.debug(`[DEBUG] Processed ${nbCsvRows} rows...`);
     }
   }
-
+  let batch =  db.collection('Products').initializeOrderedBulkOp();
+  await db.collection('Products').createIndex( { _id: 1 } );
   const products = dataRows.filter(dataRow => dataRow).map(row => Product.fromCsv(row));
-  await Promise.map(products, async (product, i) => {
-    const updateResult = await db.collection('Products')
-      .updateOne(
-        { _id: product._id },
-        { $set: product },
-        { upsert: true });
-    updateMetrics(updateResult);
+
+  products.forEach((product, i) => {
+    batch.find({ _id: product._id }).upsert().updateOne({ $set: product });
     logProgress(i);
   });
 
-  const dbIds = (await db.collection('Products').find({}, {_id: 1}).toArray()).map(o => o._id);
-  const isDeletedId = id => !products.find(p => p._id === id);
-  const deletedProductIds = dbIds.filter(id => isDeletedId(id));
-  for (const pId of deletedProductIds) {
-    const deleteResult = await db.collection('Products').deleteOne({_id: pId});
-    if (deleteResult.deletedCount) {
-      metrics.deletedCount += 1;
-    }
-  }
+  const ids = products.map(p => p._id);
+  batch.find({_id: { $nin: ids}}, {_id: 1}).delete();
 
-  logMetrics(dataRows.length-1, metrics);// dataRows.length-1 because there is a new line at the end of file.
+  await batch.execute();
+  const bulkResult = batch.s.bulkResult;
+  updateMetrics(bulkResult);
+  if (bulkResult.nRemoved) {
+    metrics.deletedCount += bulkResult.nRemoved;
+  }
+  logMetrics(dataRows.length - 1, metrics);// dataRows.length-1 because there is a new line at the end of file.
 }
 
 function logMetrics(numberOfProcessedRows, metrics) {
