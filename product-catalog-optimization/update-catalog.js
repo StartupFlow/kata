@@ -7,66 +7,94 @@ const { timing } = require('./helpers/timing');
 const { Metrics } = require('./helpers/metrics');
 const { Product } = require('./product');
 
-const MONGO_URL = 'mongodb://localhost:27017/test-product-catalog';
-const catalogUpdateFile = 'updated-catalog.csv';
+const MONGO_URL = 'mongodb://127.0.0.1:27017/test-product-catalog';
+const fileName = 'updated-catalog';
+const fileExtension = '.csv';
+const catalogDeleteFile = 'deleted-catalog.csv';
+
+// -----------------------------------------------------------------------------------------------------
+// @ Bootstrap
+// -----------------------------------------------------------------------------------------------------
 
 async function main() {
   const mongoClient = new MongoClient(MONGO_URL);
   const connection = await mongoClient.connect();
   const db = connection.db();
-  await memory(
-    'Update dataset',
-    () => timing(
-      'Update dataset',
-      () => updateDataset(db)));
+  await memory('Update dataset', () => timing('Update dataset', () => updateDataset(db)));
 }
 
+// -----------------------------------------------------------------------------------------------------
+// @ Dataset Update
+// -----------------------------------------------------------------------------------------------------
+
 async function updateDataset(db) {
-  const csvContent = fs.readFileSync(catalogUpdateFile, 'utf-8');
-  const rowsWithHeader = csvContent.split('\n');
-  const dataRows = rowsWithHeader.slice(1);// skip headers
+  // Identifies the file in which the deleted products are stored.
+  const deleteFile = fs.readdirSync(__dirname).find((file) => file === catalogDeleteFile);
 
-  const metrics = Metrics.zero();
-  function updateMetrics(updateResult) {
-    if (updateResult.modifiedCount) {
-      metrics.updatedCount += 1;
-    }
-    if (updateResult.upsertedCount) {
-      metrics.addedCount += 1;
-    }
-  }
-
-  const dbCatalogSize = await db.collection('Products').count();
-  const closestPowOf10 = 10**(Math.ceil(Math.log10(dbCatalogSize)));
-  function logProgress(nbCsvRows) {
-    const progressIndicator = nbCsvRows * 100 / closestPowOf10;
-    if (progressIndicator%10 === 0) {
-      console.debug(`[DEBUG] Processed ${nbCsvRows} rows...`);
-    }
-  }
-
-  const products = dataRows.filter(dataRow => dataRow).map(row => Product.fromCsv(row));
-  await Promise.map(products, async (product, i) => {
-    const updateResult = await db.collection('Products')
-      .updateOne(
-        { _id: product._id },
-        { $set: product },
-        { upsert: true });
-    updateMetrics(updateResult);
-    logProgress(i);
+  // Identifies the files in which the updated products are stored.
+  const filesList = fs.readdirSync(__dirname).filter((file) => {
+    const isCsvFile = file.includes(fileName) && file.includes(fileExtension);
+    if (isCsvFile && fs.existsSync(file)) return file;
   });
 
-  const dbIds = (await db.collection('Products').find({}, {_id: 1}).toArray()).map(o => o._id);
-  const isDeletedId = id => !products.find(p => p._id === id);
-  const deletedProductIds = dbIds.filter(id => isDeletedId(id));
-  for (const pId of deletedProductIds) {
-    const deleteResult = await db.collection('Products').deleteOne({_id: pId});
-    if (deleteResult.deletedCount) {
-      metrics.deletedCount += 1;
-    }
+  const metrics = Metrics.zero();
+  const dbCatalogSize = await db.collection('Products').count();
+  const closestPowOf10 = 10**(Math.ceil(Math.log10(dbCatalogSize)));
+  let dataRowsLength = 0;
+
+  await Promise.all(
+    filesList.map(async (file) => {
+
+      const csvContent = fs.readFileSync(file, 'utf-8');
+      const rowsWithHeader = csvContent.split('\n');
+      const dataRows = rowsWithHeader.slice(1);
+      dataRowsLength += dataRows.length;
+
+      // Maps an updateOne / upsert instruction for each row
+      const updateInstructions = await Promise.all(dataRows.map(async (row) => {
+        return new Promise(resolve => {
+          const productRow = Product.fromCsv(row);
+          resolve({
+            updateOne: {
+              filter: { _id: productRow._id },
+              update: { $set: productRow },
+              upsert: true
+            }
+          })
+        });
+      }));
+
+      // Updates database by bulk
+      const updateResult = await db.collection('Products').bulkWrite(updateInstructions);
+      if (updateResult.nModified) metrics.updatedCount += updateResult.nModified;
+      if (updateResult.nUpserted) metrics.addedCount += updateResult.nUpserted;
+    })
+  )
+
+  const deleteCsvContent = fs.readFileSync(deleteFile, 'utf-8');
+  const deleteRowsWithHeader = deleteCsvContent.split('\n');
+  const deleteDataRows = deleteRowsWithHeader.slice(1); // skip header
+
+  // Mapping products ids from the deleted products file + collection.deleteMany(). 
+  const deletedProductIds = deleteDataRows.map((row) => Product.fromCsv(row)._id).filter((id) => id !== '');
+  const deletedResults = await db.collection('Products').deleteMany({_id: { $in: deletedProductIds}});
+
+  if (deletedResults && deletedResults?.deletedCount) {
+    metrics.deletedCount += deletedResults.deletedCount;
   }
 
-  logMetrics(dataRows.length-1, metrics);// dataRows.length-1 because there is a new line at the end of file.
+  logMetrics(dataRowsLength - 1, metrics); // dataRows.length - 1 because there is a new line at the end of file.
+}
+
+// -----------------------------------------------------------------------------------------------------
+// @ Utils
+// -----------------------------------------------------------------------------------------------------
+
+function logProgress(nbCsvRows) {
+  const progressIndicator = nbCsvRows * 100 / closestPowOf10;
+  if (progressIndicator % 10 === 0) {
+    console.debug(`[DEBUG] Processed ${nbCsvRows} rows...`);
+  }
 }
 
 function logMetrics(numberOfProcessedRows, metrics) {
